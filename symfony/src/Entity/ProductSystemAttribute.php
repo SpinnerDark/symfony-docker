@@ -38,6 +38,28 @@ class ProductSystemAttribute
    */
   private $name;
 
+  /**
+   * @var \DateTime
+   *
+   * @ORM\Column(type="datetime")
+   * @Assert\Type("\DateTimeInterface")
+   */
+  private $createTime;
+
+  /**
+   * @var \DateTime
+   *
+   * @ORM\Column(type="datetime")
+   * @Assert\Type("\DateTimeInterface")
+   */
+  private $lastUpdate;
+
+
+  public function __construct()
+  {
+      $this->createTime = new \DateTime();
+  }
+
 
   public function setProducts(array $products): void {
     $this->products = $products;
@@ -54,5 +76,25 @@ class ProductSystemAttribute
   public function getName(): ?string {
     return $this->name;
   } 
+
+  public function getCreateTime()
+  {
+    return $this->createTime;
+  }
+
+  public function setCreateTime($createTime)
+  {
+    $this->createTime = $createTime;
+  }
+
+  public function getLastUpdate()
+  {
+    return $this->lastUpdate;
+  }
+
+  public function setLastUpdate($lastUpdate)
+  {
+    $this->lastUpdate = $lastUpdate;
+  }
   
 }

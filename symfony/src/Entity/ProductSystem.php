@@ -263,6 +263,27 @@ class ProductSystem
    */
   private $productImages;
 
+  /**
+   * @var \DateTime
+   *
+   * @ORM\Column(type="datetime")
+   * @Assert\Type("\DateTimeInterface")
+   */
+  private $createTime;
+
+  /**
+   * @var \DateTime
+   *
+   * @ORM\Column(type="datetime")
+   * @Assert\Type("\DateTimeInterface")
+   */
+  private $lastUpdate;
+
+  public function __construct()
+  {
+      $this->createTime = new \DateTime();
+  }
+
 
   public function getId(): ?string {
     return $this->id;
@@ -538,6 +559,26 @@ class ProductSystem
 
   public function getProductImages(): array {
     return $this->productImages;
+  }
+
+  public function getCreateTime()
+  {
+    return $this->createTime;
+  }
+
+  public function setCreateTime($createTime)
+  {
+    $this->createTime = $createTime;
+  }
+
+  public function getLastUpdate()
+  {
+    return $this->lastUpdate;
+  }
+
+  public function setLastUpdate($lastUpdate)
+  {
+    $this->lastUpdate = $lastUpdate;
   }
 
 }

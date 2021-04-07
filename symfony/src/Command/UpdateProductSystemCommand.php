@@ -17,6 +17,8 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Doctrine\DBAL\DBALException;
+
 
 class UpdateProductSystemCommand extends Command
 {
@@ -65,13 +67,15 @@ class UpdateProductSystemCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+      $executeCode = 0;
       $url = $input->getArgument('url');
-
       $response = $this->client->request('GET', $url);
 
       $statusCode = $response->getStatusCode();
       if (200 !== $statusCode) {
-    		throw new \Exception('URL error. Please check the url');
+        $message = 'URL error. Please check the url';
+        $this->io(sprintf('Error: "%s"', $message));
+        return Command::FAILURE; 
 			}
 
       $contentType = $response->getHeaders()['content-type'][0];
@@ -81,7 +85,6 @@ class UpdateProductSystemCommand extends Command
 			    case "application/json":
           $articles = json_decode($response->getContent(), true);
           $articles = $this->array_change_key_case_recursive($articles["Data"]);
-          //print_r($articulos["Data"]);
           foreach ($articles as $key => $value) {
             $productSystem = $this->productSystem->findOneBySku($value["sku_provider"]);
             if (null === $productSystem) {
@@ -92,8 +95,7 @@ class UpdateProductSystemCommand extends Command
             $productSystem->setActive($value["active"]);
             $productSystem->setProductImages($value["images"]);
 
-            $this->entityManager->persist($productSystem);
-            $this->entityManager->flush();
+            $this->persistEntity($productSystem);
 
             if (isset($value["attributes"])) {
               foreach ($value["attributes"] as $key => $attr) {
@@ -106,8 +108,8 @@ class UpdateProductSystemCommand extends Command
 			    break;
 
 			    case "application/xml":
-          $articulos = simplexml_load_file($url);
-          foreach ($articulos->Articulo as $articulo) {
+          $articles = simplexml_load_file($url);
+          foreach ($articles->Articulo as $articulo) {
             $productSystem = $this->productSystem->findOneBySku($articulo->Codigo);
             if (null === $productSystem) {
               $productSystem = new ProductSystem();
@@ -126,8 +128,7 @@ class UpdateProductSystemCommand extends Command
             $productSystem->setStockAvailable((int)$articulo->StockReal);
             $productSystem->setVmd((int)$articulo->VMD);
 
-            $this->entityManager->persist($productSystem);
-            $this->entityManager->flush();
+            $this->persistEntity($productSystem);
           }
 			    break;
 
@@ -138,7 +139,9 @@ class UpdateProductSystemCommand extends Command
             $save_file_loc = $dir . $file_name;
           }
           else {
-            throw new \Exception('File downloading failed.');
+            $message = 'File downloading failed.';
+            $this->io(sprintf('Error: "%s"', $message));
+            return Command::FAILURE; 
           }
   
           if ( $xlsx = SimpleXLSX::parse($save_file_loc) ) {
@@ -175,8 +178,7 @@ class UpdateProductSystemCommand extends Command
               }
               
               $productSystem->setCbm($value["cbm"]);
-              $this->entityManager->persist($productSystem);
-              $this->entityManager->flush();
+              $this->persistEntity($productSystem);
                 
               for ($i=1; $i < 69; $i++) { 
                 $attr_value = "value_" . $i;
@@ -184,29 +186,25 @@ class UpdateProductSystemCommand extends Command
                 if ($value[$attr_value] != null) {
                   $label = "attribute_" . $i;
                   $attributeName = $value[$label];
-                  $attribute = $this->productSystemAttribute->findOneByName($value[$label]);
-                  if (null === $attribute) {
-                    $attribute = new ProductSystemAttribute();
-                    $attribute->setName($value[$label]);
-                    $this->entityManager->persist($attribute);
-                    $this->entityManager->flush();
-                  }
                   $this->fill_attr_product($productSystem, $attributeName, $attributeValue);
                 }
               }
             }
           } else {
-            throw new \Exception(SimpleXLSX::parseError());
+            $message = SimpleXLSX::parseError();
+            $this->io(sprintf('Error: "%s"', $message));
+            return Command::FAILURE; 
           }
           unlink($file_name);
           break;
 
           default:
-          throw new \Exception('File extension not supported');
+            $message = 'File extension not supported';
+            $this->io(sprintf('Error: "%s"', $message));
+            return Command::FAILURE; 
           break;
 			}
 
-      $this->io->success(sprintf('Code "%s"', $statusCode));
       return Command::SUCCESS;
     }
 
@@ -260,8 +258,7 @@ HELP;
       if (null === $attribute) {
         $attribute = new ProductSystemAttribute();
         $attribute->setName($attributeName);
-        $this->entityManager->persist($attribute);
-        $this->entityManager->flush();
+        $this->persistEntity($attribute);
       }
       $productAttribute = $this->productAttribute->findOneBy([
         'product' => $productSystem,
@@ -273,8 +270,20 @@ HELP;
         $productAttribute->setAttribute($attribute);
       }
       $productAttribute->setValue($attributeValue);
-      $this->entityManager->persist($productAttribute);
-      $this->entityManager->flush();
+      $this->persistEntity($productAttribute);
+    }
+
+    public function persistEntity($entity) {
+      try {
+        $entity->setLastUpdate(new \DateTime()); 
+        $this->entityManager->persist($entity);
+        $this->entityManager->flush(); 
+      }
+      catch(DBALException $e) {
+        $message = sprintf('DBALException [%i]: %s', $e->getCode(), $e->getMessage());
+        $this->io(sprintf('Error: "%s"', $message));
+        return Command::FAILURE; 
+      }
     }
 
     public function array_change_key_case_recursive($arr)
